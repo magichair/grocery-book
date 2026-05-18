@@ -82,7 +82,8 @@ export async function POST(req: Request, { params }: Ctx) {
     productName?: string
     barcode?: string
     totalPrice?: number
-    quantity?: number
+    unitPrice?: number   // explicit unit price from shelf tag — preferred over computing from qty
+    quantity?: number    // optional when unitPrice is provided directly
     unit?: string
     isOnSale?: boolean
     notes?: string
@@ -99,16 +100,25 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!body.totalPrice || body.totalPrice <= 0) {
     return NextResponse.json({ error: "totalPrice must be positive" }, { status: 400 })
   }
-  if (!body.quantity || body.quantity <= 0) {
-    return NextResponse.json({ error: "quantity must be positive" }, { status: 400 })
-  }
   if (!body.unit?.trim()) {
     return NextResponse.json({ error: "unit is required" }, { status: 400 })
   }
 
-  // Compute unit price
-  const unitPriceValue = body.totalPrice / body.quantity
-  const unitPriceStr = unitPriceValue.toFixed(10) // enough decimal places for Decimal(10,4)
+  // Resolve unit price: use explicit value if provided, otherwise compute from quantity
+  let unitPriceValue: number
+  if (body.unitPrice !== undefined && body.unitPrice > 0) {
+    unitPriceValue = body.unitPrice
+  } else if (body.quantity && body.quantity > 0) {
+    unitPriceValue = body.totalPrice / body.quantity
+  } else {
+    return NextResponse.json(
+      { error: "provide unitPrice or a positive quantity" },
+      { status: 400 }
+    )
+  }
+  const unitPriceStr = unitPriceValue.toFixed(10)
+  // quantity defaults to 1 when only unit price is provided (we still need to store something)
+  const resolvedQuantity = body.quantity && body.quantity > 0 ? body.quantity : 1
 
   // Get previous best price for this item to determine isNewBest
   const previousBest = await prisma.priceObservation.findFirst({
@@ -128,7 +138,7 @@ export async function POST(req: Request, { params }: Ctx) {
       productName: body.productName.trim(),
       barcode: body.barcode ?? null,
       totalPrice: body.totalPrice.toString(),
-      quantity: body.quantity.toString(),
+      quantity: resolvedQuantity.toString(),
       unit: body.unit.trim(),
       unitPrice: unitPriceStr,
       isOnSale: body.isOnSale ?? false,

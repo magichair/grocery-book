@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronLeft, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 import Link from "next/link"
 import Combobox, { type ComboboxOption } from "@/components/combobox"
-import UnitPriceDisplay from "@/components/unit-price-display"
+import { formatUnitPrice } from "@/lib/format-unit-price"
 import ConfirmationSheet from "@/components/confirmation-sheet"
 
 const COMMON_UNITS = ["oz", "fl oz", "lb", "kg", "g", "count", "load", "roll", "sq ft", "L", "ml"]
@@ -30,6 +30,8 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
   const [item, setItem] = useState<ComboboxOption | null>(null)
   const [store, setStore] = useState<ComboboxOption | null>(null)
   const [totalPrice, setTotalPrice] = useState("")
+  const [unitPrice, setUnitPrice] = useState("")
+  const [unitPriceAuto, setUnitPriceAuto] = useState(false) // true = was auto-computed
   const [quantity, setQuantity] = useState("")
   const [unit, setUnit] = useState("oz")
   const [customUnit, setCustomUnit] = useState("")
@@ -99,13 +101,34 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
 
   const activeUnit = showCustomUnit ? customUnit : unit
 
+  // Auto-compute unit price when total + quantity are both filled, unless user has typed it manually
+  useEffect(() => {
+    const t = parseFloat(totalPrice)
+    const q = parseFloat(quantity)
+    if (t > 0 && q > 0 && !isNaN(t) && !isNaN(q)) {
+      setUnitPrice((t / q).toFixed(4))
+      setUnitPriceAuto(true)
+    }
+  }, [totalPrice, quantity])
+
+  function handleUnitPriceChange(val: string) {
+    setUnitPrice(val)
+    setUnitPriceAuto(false) // user took control
+  }
+
+  const unitPriceNum = parseFloat(unitPrice)
+  const formattedUnitPrice =
+    unitPrice && activeUnit && !isNaN(unitPriceNum) && unitPriceNum > 0
+      ? formatUnitPrice(unitPrice, activeUnit)
+      : null
+
   async function handleSubmit(e: React.FormEvent | React.MouseEvent) {
     e.preventDefault()
     setError(null)
 
     if (!item) { setError("Please select an item."); return }
-    if (!totalPrice || parseFloat(totalPrice) <= 0) { setError("Enter a valid price."); return }
-    if (!quantity || parseFloat(quantity) <= 0) { setError("Enter a valid quantity."); return }
+    if (!totalPrice || parseFloat(totalPrice) <= 0) { setError("Enter a valid total price."); return }
+    if (!unitPrice || parseFloat(unitPrice) <= 0) { setError("Enter a valid unit price."); return }
     if (!activeUnit.trim()) { setError("Please select or enter a unit."); return }
 
     setSubmitting(true)
@@ -119,7 +142,8 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
           brand: brand.trim() || undefined,
           productName: productName.trim() || `${brand.trim() ? brand.trim() + " " : ""}${item.name}`,
           totalPrice: parseFloat(totalPrice),
-          quantity: parseFloat(quantity),
+          unitPrice: parseFloat(unitPrice),
+          quantity: quantity && parseFloat(quantity) > 0 ? parseFloat(quantity) : undefined,
           unit: activeUnit.trim(),
           isOnSale,
           notes: notes.trim() || undefined,
@@ -145,6 +169,8 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
     setShowConfirmation(false)
     setResult(null)
     setTotalPrice("")
+    setUnitPrice("")
+    setUnitPriceAuto(false)
     setQuantity("")
     setBrand("")
     setProductName("")
@@ -205,7 +231,7 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
           onCreateOption={createStore}
         />
 
-        {/* Price row */}
+        {/* Price row — total and unit price side by side */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <label htmlFor="total-price" className="text-sm font-medium text-slate-700">
@@ -230,23 +256,49 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="quantity" className="text-sm font-medium text-slate-700">
-              Quantity <span className="text-red-500">*</span>
+            <label htmlFor="unit-price" className="text-sm font-medium text-slate-700 flex items-baseline gap-1">
+              Unit price <span className="text-red-500">*</span>
+              {unitPriceAuto && unitPrice && (
+                <span className="text-[11px] text-slate-400 font-normal">(auto)</span>
+              )}
             </label>
             <input
-              id="quantity"
+              id="unit-price"
               type="number"
               inputMode="decimal"
-              min="0.01"
+              min="0.0001"
               step="any"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="1"
+              value={unitPrice}
+              onChange={(e) => handleUnitPriceChange(e.target.value)}
+              placeholder="0.257"
               className="w-full px-3 py-3 border border-slate-200 rounded-xl text-base
                          focus:border-blue-800 focus:ring-2 focus:ring-blue-800/20 focus:outline-none
                          transition-all duration-150 min-h-[48px]"
             />
+            {formattedUnitPrice && (
+              <p className="text-xs text-slate-500 pl-1">{formattedUnitPrice}</p>
+            )}
           </div>
+        </div>
+
+        {/* Quantity — optional helper for auto-computing unit price */}
+        <div className="space-y-1">
+          <label htmlFor="quantity" className="text-sm font-medium text-slate-700">
+            Quantity <span className="text-[11px] text-slate-400 font-normal">(optional — fills unit price automatically)</span>
+          </label>
+          <input
+            id="quantity"
+            type="number"
+            inputMode="decimal"
+            min="0.01"
+            step="any"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="e.g. 19.4 for a 19.4 oz bottle"
+            className="w-full px-3 py-3 border border-slate-200 rounded-xl text-base
+                       focus:border-blue-800 focus:ring-2 focus:ring-blue-800/20 focus:outline-none
+                       transition-all duration-150 min-h-[48px]"
+          />
         </div>
 
         {/* Unit selector */}
@@ -294,13 +346,6 @@ export default function RecordPage({ params }: { params: Promise<{ bookId: strin
             />
           )}
         </div>
-
-        {/* Live unit price */}
-        <UnitPriceDisplay
-          totalPrice={totalPrice}
-          quantity={quantity}
-          unit={activeUnit}
-        />
 
         {/* More details disclosure */}
         <div>
