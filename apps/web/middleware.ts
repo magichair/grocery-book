@@ -1,5 +1,9 @@
-import { auth } from "@/auth"
+import NextAuth from "next-auth"
+import { authConfig } from "@/auth.config"
 import { NextResponse } from "next/server"
+
+// Instantiate auth from the Edge-safe config only — no Prisma.
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
   const isAuthenticated = !!req.auth
@@ -13,8 +17,7 @@ export default auth((req) => {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     if (isProtectedPage) {
-      const signInUrl = new URL("/sign-in", req.url)
-      return NextResponse.redirect(signInUrl)
+      return NextResponse.redirect(new URL("/sign-in", req.url))
     }
   }
 })
