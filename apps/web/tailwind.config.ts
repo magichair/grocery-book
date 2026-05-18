@@ -7,7 +7,15 @@ const config: Config = {
     "../../packages/ui/src/**/*.{ts,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        brand: {
+          DEFAULT: "#1E40AF",
+          light: "#3B82F6",
+        },
+        "best-price": "#F59E0B",
+      },
+    },
   },
   plugins: [],
 }

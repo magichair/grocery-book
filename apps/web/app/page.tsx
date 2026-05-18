@@ -1,8 +1,12 @@
-export default function HomePage() {
-  return (
-    <main className="min-h-screen p-4">
-      <h1 className="text-2xl font-bold">Grocery Book</h1>
-      <p className="mt-2 text-gray-600">Track and compare unit prices.</p>
-    </main>
-  )
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
+
+export default async function RootPage() {
+  const session = await auth()
+  if (!session) {
+    redirect("/sign-in")
+  }
+  // Feature 2 will add lastActiveBookId lookup.
+  // Placeholder until then:
+  redirect("/books/placeholder")
 }
