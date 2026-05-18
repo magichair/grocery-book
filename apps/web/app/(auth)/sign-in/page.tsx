@@ -22,7 +22,7 @@ export default function SignInPage() {
 
     startTransition(async () => {
       try {
-        const result = await signIn("resend", { email, redirect: false })
+        const result = await signIn("resend", { email, redirect: false, callbackUrl: "/" })
         if (result?.error) {
           setError("Something went wrong. Please try again.")
           return

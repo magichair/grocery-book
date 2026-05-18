@@ -1,15 +1,11 @@
 import type { NextAuthConfig } from "next-auth"
-import Resend from "next-auth/providers/resend"
 
-// Edge-compatible config — no Prisma, no Node.js-only imports.
-// Used by middleware. Full auth.ts extends this with the Prisma adapter.
+// Minimal config used by middleware (Edge Runtime — no Node.js, no Prisma).
+// Providers are intentionally absent: the middleware only verifies JWT cookies,
+// it never handles email sign-in flows.
 export const authConfig = {
-  providers: [
-    Resend({
-      from: process.env.RESEND_FROM ?? "noreply@example.com",
-    }),
-  ],
   pages: {
     signIn: "/sign-in",
   },
+  providers: [],
 } satisfies NextAuthConfig
