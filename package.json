@@ -1,0 +1,23 @@
+{
+  "name": "grocery-book",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "prisma": {
+    "schema": "packages/db/prisma/schema.prisma"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "pnpm --filter web dev",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "check:all": "bash scripts/check-spec.sh && bash scripts/check-schema.sh && bash scripts/check-scaffold.sh && bash scripts/check-api-schemas.sh && bash scripts/check-api-routes.sh && bash scripts/check-api-docs.sh",
+    "db:migrate": "pnpm --filter @grocery-book/db db:migrate",
+    "db:push": "pnpm --filter @grocery-book/db db:push",
+    "db:generate": "pnpm --filter @grocery-book/db db:generate",
+    "db:studio": "pnpm --filter @grocery-book/db db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}

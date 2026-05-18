@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookMemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum BookVisibility {
+  PRIVATE
+  INVITE_ONLY
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  preference   UserPreference?
+  ownedBooks   Book[]
+  memberships  BookMember[]
+  observations PriceObservation[]
+}
+
+model UserPreference {
+  userId           String  @id
+  user             User    @relation(fields: [userId], references: [id])
+  lastActiveBookId String?
+  lastActiveBook   Book?   @relation(fields: [lastActiveBookId], references: [id])
+  updatedAt        DateTime @updatedAt
+}
+
+model Book {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User           @relation(fields: [ownerId], references: [id])
+  visibility  BookVisibility @default(INVITE_ONLY)
+  createdAt   DateTime       @default(now())
+
+  members      BookMember[]
+  items        GenericItem[]
+  stores       Store[]
+  observations PriceObservation[]
+  userPrefs    UserPreference[]
+}
+
+model BookMember {
+  bookId    String
+  book      Book           @relation(fields: [bookId], references: [id])
+  userId    String
+  user      User           @relation(fields: [userId], references: [id])
+  role      BookMemberRole @default(EDITOR)
+  invitedAt  DateTime      @default(now())
+  acceptedAt DateTime?
+
+  @@id([bookId, userId])
+  @@index([bookId])
+  @@index([userId])
+}
+
+model GenericItem {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+  name      String
+  category  String?
+  createdAt DateTime @default(now())
+
+  observations PriceObservation[]
+
+  @@index([bookId])
+  @@index([bookId, name])
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+  name      String
+  location  String?
+  createdAt DateTime @default(now())
+
+  observations PriceObservation[]
+
+  @@index([bookId])
+}
+
+model PriceObservation {
+  id            String   @id @default(cuid())
+  bookId        String
+  book          Book        @relation(fields: [bookId], references: [id])
+  genericItemId String
+  genericItem   GenericItem @relation(fields: [genericItemId], references: [id])
+  storeId       String?
+  store         Store?      @relation(fields: [storeId], references: [id])
+  storeRaw      String?
+  recordedById  String
+  recordedBy    User        @relation(fields: [recordedById], references: [id])
+
+  brand        String?
+  productName  String
+  barcode      String?
+
+  totalPrice Decimal @db.Decimal(10, 4)
+  quantity   Decimal @db.Decimal(10, 4)
+  unit       String
+  unitPrice  Decimal @db.Decimal(10, 4)
+
+  isOnSale Boolean  @default(false)
+  notes    String?
+
+  observedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([genericItemId])
+  @@index([bookId])
+  @@index([barcode])
+  @@index([observedAt])
+  @@index([bookId, genericItemId])
+}
