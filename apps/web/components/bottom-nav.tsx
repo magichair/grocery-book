@@ -7,10 +7,15 @@ import { ShoppingBasket, Plus, BookOpen } from "lucide-react"
 export default function BottomNav() {
   const pathname = usePathname()
 
+  // Extract bookId from /books/[bookId]/... — segment index 2
+  const segments = pathname.split("/")
+  const bookId = segments[1] === "books" && segments[2] ? segments[2] : null
+
   const isItems =
-    pathname.startsWith("/books") &&
+    !!bookId &&
     !pathname.includes("/record") &&
-    !pathname.includes("/settings")
+    !pathname.includes("/settings") &&
+    !pathname.includes("/items/")
 
   const isSettings = pathname.includes("/settings")
 
@@ -22,7 +27,7 @@ export default function BottomNav() {
     >
       {/* Items tab */}
       <Link
-        href="/books/placeholder"
+        href={bookId ? `/books/${bookId}` : "/"}
         className={`flex flex-col items-center justify-center flex-1 gap-1 min-h-[44px]
                     cursor-pointer transition-colors duration-150
                     ${isItems ? "text-blue-800" : "text-slate-400 hover:text-slate-600"}`}
@@ -33,7 +38,7 @@ export default function BottomNav() {
 
       {/* Record tab — elevated FAB */}
       <Link
-        href="/books/placeholder/record"
+        href={bookId ? `/books/${bookId}/record` : "/"}
         aria-label="Record a price"
         className="flex items-center justify-center w-14 h-14 -mt-5 rounded-full
                    bg-blue-800 text-white shadow-lg active:scale-95
@@ -44,7 +49,7 @@ export default function BottomNav() {
 
       {/* Book settings tab */}
       <Link
-        href="/books/placeholder/settings"
+        href={bookId ? `/books/${bookId}/settings` : "/"}
         className={`flex flex-col items-center justify-center flex-1 gap-1 min-h-[44px]
                     cursor-pointer transition-colors duration-150
                     ${isSettings ? "text-blue-800" : "text-slate-400 hover:text-slate-600"}`}

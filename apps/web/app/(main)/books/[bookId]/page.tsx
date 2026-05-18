@@ -1,7 +1,8 @@
-export default function BookPage() {
-  return (
-    <div className="flex items-center justify-center h-48 text-sm text-slate-400">
-      Item list &mdash; coming in Feature 3
-    </div>
-  )
+import ItemList from "@/components/item-list"
+
+type Props = { params: Promise<{ bookId: string }> }
+
+export default async function BookPage({ params }: Props) {
+  const { bookId } = await params
+  return <ItemList bookId={bookId} />
 }
