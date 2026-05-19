@@ -32,6 +32,7 @@ model User {
   ownedBooks   Book[]
   memberships  BookMember[]
   observations PriceObservation[]
+  sentInvites  BookInvite[] @relation("SentInvites")
 }
 
 // Auth.js adapter required models ─────────────────────────────────────────────
@@ -97,6 +98,7 @@ model Book {
   stores       Store[]
   observations PriceObservation[]
   userPrefs    UserPreference[]
+  bookInvites  BookInvite[]
 }
 
 model BookMember {
@@ -172,4 +174,22 @@ model PriceObservation {
   @@index([barcode])
   @@index([observedAt])
   @@index([bookId, genericItemId])
+}
+
+model BookInvite {
+  id        String         @id @default(cuid())
+  bookId    String
+  book      Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  token     String         @unique @default(cuid())
+  email     String?        // hint only — not used for auth matching
+  role      BookMemberRole @default(EDITOR)
+  invitedBy String
+  inviter   User           @relation("SentInvites", fields: [invitedBy], references: [id])
+  expiresAt DateTime
+  claimedBy String?        // userId who claimed it
+  claimedAt DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([bookId])
+  @@index([token])
 }

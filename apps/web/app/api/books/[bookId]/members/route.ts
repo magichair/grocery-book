@@ -21,19 +21,32 @@ export async function GET(_req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const members = await prisma.bookMember.findMany({
-    where: { bookId },
-    include: { user: { select: { id: true, name: true, email: true } } },
-    orderBy: { invitedAt: "asc" },
-  })
+  const [members, invites] = await Promise.all([
+    prisma.bookMember.findMany({
+      where: { bookId, acceptedAt: { not: null } },
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { invitedAt: "asc" },
+    }),
+    prisma.bookInvite.findMany({
+      where: { bookId, claimedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
+    }),
+  ])
 
-  return NextResponse.json(
-    members.map((m) => ({
+  return NextResponse.json({
+    members: members.map((m) => ({
       userId: m.userId,
       role: m.role,
-      invitedAt: m.invitedAt.toISOString(),
-      acceptedAt: m.acceptedAt?.toISOString() ?? null,
+      acceptedAt: m.acceptedAt!.toISOString(),
       user: m.user,
-    }))
-  )
+    })),
+    pendingInvites: invites.map((i) => ({
+      id: i.id,
+      email: i.email,
+      role: i.role,
+      createdAt: i.createdAt.toISOString(),
+      expiresAt: i.expiresAt.toISOString(),
+    })),
+  })
 }

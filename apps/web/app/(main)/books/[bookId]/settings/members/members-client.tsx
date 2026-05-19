@@ -10,8 +10,12 @@ interface Member {
   user: { id: string; name: string | null; email: string }
 }
 
-interface PendingMember extends Member {
-  invitedAt: string
+interface PendingInvite {
+  id: string
+  email: string | null
+  role: string
+  createdAt: string
+  expiresAt: string
 }
 
 interface Props {
@@ -19,15 +23,17 @@ interface Props {
   currentUserId: string
   isOwner: boolean
   active: Member[]
-  pending: PendingMember[]
+  pendingInvites: PendingInvite[]
 }
 
 interface InviteResponse {
   error?: string
-  userId?: string
-  user?: Member["user"]
+  id?: string
+  token?: string
+  email?: string | null
   role?: string
-  invitedAt?: string
+  createdAt?: string
+  expiresAt?: string
 }
 
 export default function MembersClient({
@@ -35,11 +41,11 @@ export default function MembersClient({
   currentUserId,
   isOwner,
   active,
-  pending,
+  pendingInvites,
 }: Props) {
   const router = useRouter()
   const [activeMembers, setActiveMembers] = useState(active)
-  const [pendingMembers, setPendingMembers] = useState(pending)
+  const [pendingList, setPendingList] = useState(pendingInvites)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"EDITOR" | "VIEWER">("EDITOR")
@@ -56,9 +62,9 @@ export default function MembersClient({
     })
   }
 
-  function handleRevoke(userId: string) {
-    fetch(`/api/books/${bookId}/members/${userId}`, { method: "DELETE" }).then((res) => {
-      if (res.ok) setPendingMembers((m) => m.filter((x) => x.userId !== userId))
+  function handleRevoke(inviteId: string) {
+    fetch(`/api/books/${bookId}/invites/${inviteId}`, { method: "DELETE" }).then((res) => {
+      if (res.ok) setPendingList((m) => m.filter((x) => x.id !== inviteId))
     })
   }
 
@@ -76,13 +82,14 @@ export default function MembersClient({
         setInviteError(data.error ?? "Something went wrong.")
         return
       }
-      setPendingMembers((m) => [
+      setPendingList((m) => [
         ...m,
         {
-          userId: data.userId!,
+          id: data.id!,
+          email: data.email ?? null,
           role: data.role!,
-          user: data.user!,
-          invitedAt: data.invitedAt!,
+          createdAt: data.createdAt!,
+          expiresAt: data.expiresAt!,
         },
       ])
       setInviteEmail("")
@@ -131,29 +138,29 @@ export default function MembersClient({
       </div>
 
       {/* Pending invites */}
-      {pendingMembers.length > 0 && (
+      {pendingList.length > 0 && (
         <div className="mt-4">
           <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Pending ({pendingMembers.length})
+            Pending ({pendingList.length})
           </p>
           <div className="bg-white border-y border-slate-100">
-            {pendingMembers.map((m) => (
+            {pendingList.map((invite) => (
               <div
-                key={m.userId}
+                key={invite.id}
                 className="flex items-center px-4 py-3.5 min-h-[52px] border-b border-slate-100"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-900 truncate">
-                    {m.user.name ?? m.user.email}
+                    {invite.email ?? "Unknown email"}
                   </p>
                   <p className="text-[13px] text-slate-400">Invite sent</p>
                 </div>
                 <span className="text-xs text-slate-400 font-medium shrink-0 mr-3">
-                  {ROLE_LABEL[m.role]}
+                  {ROLE_LABEL[invite.role]}
                 </span>
                 {isOwner && (
                   <button
-                    onClick={() => handleRevoke(m.userId)}
+                    onClick={() => handleRevoke(invite.id)}
                     aria-label="Revoke invite"
                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 cursor-pointer transition-colors"
                   >

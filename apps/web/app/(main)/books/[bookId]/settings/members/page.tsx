@@ -18,14 +18,18 @@ export default async function MembersPage({ params }: Props) {
   })
   if (!membership) redirect("/")
 
-  const members = await prisma.bookMember.findMany({
-    where: { bookId },
-    include: { user: { select: { id: true, name: true, email: true } } },
-    orderBy: { invitedAt: "asc" },
-  })
-
-  const active = members.filter((m) => m.acceptedAt !== null)
-  const pending = members.filter((m) => m.acceptedAt === null)
+  const [members, invites] = await Promise.all([
+    prisma.bookMember.findMany({
+      where: { bookId, acceptedAt: { not: null } },
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { invitedAt: "asc" },
+    }),
+    prisma.bookInvite.findMany({
+      where: { bookId, claimedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
+    }),
+  ])
 
   return (
     <div className="min-h-full pb-8">
@@ -44,12 +48,13 @@ export default async function MembersPage({ params }: Props) {
         bookId={bookId}
         currentUserId={session.user.id}
         isOwner={membership.role === "OWNER"}
-        active={active.map((m) => ({ userId: m.userId, role: m.role, user: m.user }))}
-        pending={pending.map((m) => ({
-          userId: m.userId,
-          role: m.role,
-          user: m.user,
-          invitedAt: m.invitedAt.toISOString(),
+        active={members.map((m) => ({ userId: m.userId, role: m.role, user: m.user }))}
+        pendingInvites={invites.map((i) => ({
+          id: i.id,
+          email: i.email,
+          role: i.role,
+          createdAt: i.createdAt.toISOString(),
+          expiresAt: i.expiresAt.toISOString(),
         }))}
       />
     </div>

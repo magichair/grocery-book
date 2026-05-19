@@ -18,8 +18,7 @@ export async function POST(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   const { bookId } = await params
-  const membership = await assertMember(bookId, session.user.id)
-  if (!membership) {
+  if (!(await assertMember(bookId, session.user.id))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -31,76 +30,47 @@ export async function POST(req: Request, { params }: Ctx) {
   const email = body.email.trim().toLowerCase()
   const role = body.role === "VIEWER" ? "VIEWER" as const : "EDITOR" as const
 
-  // Look up invitee
-  const invitee = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, name: true, email: true },
-  })
-  if (!invitee) {
-    return NextResponse.json(
-      { error: "No account found for that email. Ask them to sign in to Grocery Book first." },
-      { status: 404 }
-    )
-  }
-
-  // Check not already a member
-  const existing = await prisma.bookMember.findFirst({
-    where: { bookId, userId: invitee.id },
-  })
-  if (existing) {
-    return NextResponse.json(
-      { error: existing.acceptedAt ? "Already a member." : "Already invited." },
-      { status: 409 }
-    )
-  }
-
   const book = await prisma.book.findUnique({
     where: { id: bookId },
     select: { name: true },
   })
   if (!book) {
-    return NextResponse.json({ error: "Book not found" }, { status: 404 })
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  // Create pending invite
-  const member = await prisma.bookMember.create({
+  // Create the invite token — no user lookup needed
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+  const invite = await prisma.bookInvite.create({
     data: {
       bookId,
-      userId: invitee.id,
+      email,
       role,
-      acceptedAt: null,
+      invitedBy: session.user.id,
+      expiresAt,
     },
-    include: { user: { select: { id: true, name: true, email: true } } },
+    select: { id: true, token: true, email: true, role: true, expiresAt: true, createdAt: true },
   })
 
-  // Send notification email (best-effort — don't fail the invite if email fails)
+  // Send invite email (best-effort)
   try {
     const resend = new Resend(process.env.AUTH_RESEND_KEY)
     const inviterName = session.user.name ?? session.user.email ?? "Someone"
-    const acceptUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/invites/${bookId}`
+    const claimUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/invites/claim?token=${invite.token}`
     await resend.emails.send({
       from: process.env.RESEND_FROM ?? "noreply@example.com",
       to: email,
       subject: `${inviterName} invited you to ${book.name} on Grocery Book`,
       html: `
-        <p>Hi${invitee.name ? ` ${invitee.name}` : ""},</p>
+        <p>Hi,</p>
         <p><strong>${inviterName}</strong> invited you to join the <strong>${book.name}</strong> price book on Grocery Book.</p>
-        <p><a href="${acceptUrl}" style="background:#1E40AF;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600;">Accept invitation</a></p>
-        <p>Or paste this link: ${acceptUrl}</p>
+        <p>You don't need to sign up with this email address — sign in with any email you prefer.</p>
+        <p><a href="${claimUrl}" style="background:#1E40AF;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600;">Accept invitation</a></p>
+        <p>This link expires in 7 days. Or paste: ${claimUrl}</p>
       `,
     })
   } catch (err) {
     console.error("[invites] email send failed:", err)
   }
 
-  return NextResponse.json(
-    {
-      userId: member.userId,
-      role: member.role,
-      invitedAt: member.invitedAt.toISOString(),
-      acceptedAt: null,
-      user: member.user,
-    },
-    { status: 201 }
-  )
+  return NextResponse.json(invite, { status: 201 })
 }
