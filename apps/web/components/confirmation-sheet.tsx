@@ -33,8 +33,8 @@ export default function ConfirmationSheet({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl px-6 py-6">
+      <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" />
+      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl px-6 py-6">
         {/* Handle */}
         <div className="w-8 h-1 bg-slate-300 rounded-full mx-auto mb-6" />
 
