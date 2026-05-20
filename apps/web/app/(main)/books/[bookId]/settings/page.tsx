@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@grocery-book/db"
 import BookSettingsClient from "./settings-client"
+import InstallButton from "./install-button"
 import { ChevronLeft, ChevronRight, Users, Store } from "lucide-react"
 import Link from "next/link"
 
@@ -58,6 +59,7 @@ export default async function SettingsPage({ params }: Props) {
           <span className="flex-1 text-sm font-medium text-slate-900">Stores</span>
           <ChevronRight className="w-4 h-4 text-slate-300" />
         </Link>
+        <InstallButton />
       </div>
 
       {/* Book name edit and danger zone — client component */}
