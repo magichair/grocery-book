@@ -44,11 +44,31 @@ Self-hosted, no subscription, no tracking. Your price data stays on your server.
 
 ### Quick start
 
+Pre-built images are published to GitHub Container Registry on every release:
+
+```bash
+docker pull ghcr.io/magichair/grocery-book:latest
+```
+
+Or pin to a specific version (recommended):
+
+```bash
+docker pull ghcr.io/magichair/grocery-book:1.0.0
+```
+
+Then grab the compose file and env template:
+
+```bash
+curl -O https://raw.githubusercontent.com/magichair/grocery-book/main/docker-compose.prod.yml
+curl -O https://raw.githubusercontent.com/magichair/grocery-book/main/apps/web/.env.example
+cp apps/web/.env.example .env.prod
+```
+
+Or clone the full repo if you prefer to build from source:
+
 ```bash
 git clone https://github.com/magichair/grocery-book.git
 cd grocery-book
-
-# Create your env file from the example
 cp apps/web/.env.example .env.prod
 ```
 
@@ -83,12 +103,19 @@ The app container automatically runs `prisma migrate deploy` on startup, so the 
 
 ### Updating
 
+**GHCR image (recommended):**
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod pull
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+**Build from source:**
 ```bash
 git pull
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-Migrations run automatically on restart.
+Migrations run automatically on restart in both cases.
 
 ### Reverse proxy
 
