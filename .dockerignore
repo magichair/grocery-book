@@ -1,0 +1,29 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies (installed fresh in the build)
+node_modules
+**/node_modules
+
+# Build artifacts
+.next
+**/.next
+.turbo
+
+# Local env files (secrets must be passed as runtime env vars, not baked in)
+.env
+.env.local
+.env.*.local
+**/.env.local
+
+# Dev-only compose file
+docker-compose.yml
+
+# TypeScript incremental cache
+*.tsbuildinfo
+
+# Misc
+*.log
+.DS_Store
+README.md

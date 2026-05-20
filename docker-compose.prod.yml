@@ -1,0 +1,48 @@
+# Production docker-compose — runs the app container alongside PostgreSQL.
+#
+# Usage:
+#   1. Copy .env.example to .env.prod and fill in real values
+#   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# The app container runs `prisma migrate deploy` on startup, so database
+# migrations are applied automatically on first run and after schema changes.
+#
+# To build a fresh image after a code change:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-grocery_book}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-grocery_book}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # Not exposed externally — the app connects via the internal Docker network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-grocery_book}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      AUTH_RESEND_KEY: ${AUTH_RESEND_KEY:?AUTH_RESEND_KEY is required}
+      RESEND_FROM: ${RESEND_FROM:?RESEND_FROM is required}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
