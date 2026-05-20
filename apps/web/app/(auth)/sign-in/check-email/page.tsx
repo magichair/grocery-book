@@ -1,11 +1,12 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Mail } from "lucide-react"
 import { useEffect, useState } from "react"
 import { signIn } from "next-auth/react"
 
-export default function CheckEmailPage() {
+function CheckEmailContent() {
   const email = useSearchParams().get("email") ?? ""
   const [seconds, setSeconds] = useState(60)
 
@@ -41,5 +42,13 @@ export default function CheckEmailPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CheckEmailPage() {
+  return (
+    <Suspense fallback={<div className="w-12 h-12 mx-auto" />}>
+      <CheckEmailContent />
+    </Suspense>
   )
 }
