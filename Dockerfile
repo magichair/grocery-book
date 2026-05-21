@@ -6,6 +6,9 @@ FROM node:20-alpine AS builder
 # corepack reads pnpm version from package.json#packageManager
 RUN corepack enable
 
+# OpenSSL 3 is required by the linux-musl-openssl-3.0.x Prisma engine binary
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copy workspace manifests + lockfile first for cache-efficient installs
@@ -17,16 +20,14 @@ COPY apps/web/package.json     ./apps/web/
 
 # BuildKit cache mount keeps the pnpm content-addressable store across builds.
 # Re-builds only re-download packages that actually changed.
-# OpenSSL 3 is required by the linux-musl-openssl-3.0.x Prisma engine binary
-RUN apk add --no-cache openssl
-
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 # Copy the rest of the source after install so the dependency layer is cached
 COPY . .
 
-# Generate the Prisma client (reads the schema; no database connection needed)
+# Generate the Prisma client (reads schema; no database connection needed).
+# Produces engine binaries for both native and linux-musl-openssl-3.0.x.
 RUN pnpm --filter @grocery-book/db db:generate
 
 # Build-time placeholders — real values are injected at runtime via env vars.
@@ -56,8 +57,8 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
 
-# Standalone output traces and includes exactly the runtime files needed.
-# Static assets and public/ must be copied alongside it.
+# Standalone Next.js output — traces and bundles the JS runtime files.
+# Static assets and public/ must be added alongside it.
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static      ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public             ./apps/web/public
@@ -65,14 +66,19 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public             ./app
 # Prisma schema + migrations for `prisma migrate deploy` at startup
 COPY --from=builder --chown=nextjs:nodejs /app/packages/db/prisma ./packages/db/prisma
 
-# Prisma CLI for running migrations (not part of the standalone bundle)
-RUN npm install -g prisma@5 --ignore-scripts
+# Prisma CLI — copied from builder so the nextjs user owns it and no download
+# is needed at startup. Native .so.node binaries are not traced by Next.js's
+# standalone bundler, so they must be copied explicitly.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma     ./node_modules/.bin/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma          ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma         ./node_modules/.prisma
 
-# Startup script: run migrations then start the server
+# Startup script: run migrations then hand off to the Next.js server
 COPY --chown=nextjs:nodejs <<'EOF' /entrypoint.sh
 #!/bin/sh
 set -e
-prisma migrate deploy --schema packages/db/prisma/schema.prisma
+./node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma
 exec node apps/web/server.js
 EOF
 RUN chmod +x /entrypoint.sh
