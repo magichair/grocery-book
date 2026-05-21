@@ -36,6 +36,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: builder
+    # Always build locally — never attempt to pull from a registry.
+    # Without this, `docker compose pull` invents an image name and fails.
+    pull_policy: build
     command: pnpm --filter @grocery-book/db exec prisma migrate deploy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-grocery_book}
