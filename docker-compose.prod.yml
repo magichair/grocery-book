@@ -1,20 +1,17 @@
-# Production docker-compose — runs the app container alongside PostgreSQL.
+# Production docker-compose — app + PostgreSQL.
 #
-# Usage:
-#   1. Copy apps/web/.env.example to .env.prod and fill in real values
-#   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# ── First deploy / after schema changes ────────────────────────────────────────
+# Run migrations before (or after) starting the app:
 #
-# The app container runs `prisma migrate deploy` on startup, so database
-# migrations are applied automatically on first run and after schema changes.
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm migrate
 #
-# ── Image options ───────────────────────────────────────────────────────────
-# Option A — pre-built image from GHCR (recommended for most self-hosters):
-#   Set IMAGE=ghcr.io/magichair/grocery-book:latest in your .env.prod
-#   and change the `app` service to use `image: ${IMAGE}` instead of `build`.
+# ── Normal startup ──────────────────────────────────────────────────────────────
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 #
-# Option B — build from source (default):
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-# ────────────────────────────────────────────────────────────────────────────
+# ── Update to a new image ───────────────────────────────────────────────────────
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod pull
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm migrate
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 
 services:
   postgres:
@@ -31,7 +28,21 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    # Not exposed externally — the app connects via the internal Docker network
+
+  # One-shot migration runner — uses the builder stage which has pnpm + Prisma CLI.
+  # Run with: docker compose ... run --rm migrate
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: pnpm --filter @grocery-book/db exec prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-grocery_book}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   app:
     build:

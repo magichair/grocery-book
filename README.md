@@ -72,6 +72,12 @@ cd grocery-book
 cp apps/web/.env.example .env.prod
 ```
 
+**Run migrations** before first use and after any update that changes the schema:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm migrate
+```
+
 Edit `.env.prod` with your values:
 
 ```env
