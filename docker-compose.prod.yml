@@ -1,17 +1,14 @@
 # Production docker-compose — app + PostgreSQL.
 #
-# ── First deploy / after schema changes ────────────────────────────────────────
-# Run migrations before (or after) starting the app:
+# ── GitOps / Portainer ─────────────────────────────────────────────────────────
+# Point Portainer at this repo + file.  On every detected change it runs:
+#   docker compose up -d --build
 #
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm migrate
+# Startup order is enforced automatically:
+#   postgres (healthy) → migrate (exits 0) → app
 #
-# ── Normal startup ──────────────────────────────────────────────────────────────
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-#
-# ── Update to a new image ───────────────────────────────────────────────────────
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod pull
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm migrate
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# ── Manual deploy ──────────────────────────────────────────────────────────────
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 services:
   postgres:
@@ -36,10 +33,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: builder
-    # Always build locally — never attempt to pull from a registry.
-    # Without this, `docker compose pull` invents an image name and fails.
     pull_policy: build
-    command: pnpm --filter @grocery-book/db exec prisma migrate deploy
+    command: pnpm --filter @grocery-book/db run db:migrate:deploy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-grocery_book}
     depends_on:
@@ -51,6 +46,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Always build locally — never attempt to pull from a registry.
+    # Without this, `docker compose pull` invents an image name and fails.
+    pull_policy: build
     ports:
       - "${APP_PORT:-3000}:3000"
     environment:
@@ -59,9 +57,12 @@ services:
       AUTH_RESEND_KEY: ${AUTH_RESEND_KEY:?AUTH_RESEND_KEY is required}
       RESEND_FROM: ${RESEND_FROM:?RESEND_FROM is required}
       NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL is required}
+      AUTH_TRUST_HOST: "true"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
